@@ -1,6 +1,4 @@
 "use client"
-
-import { LoginPopover } from './LoginPopover'
 import { LinearButton, GradientButton } from './ui/linear-button'
 import Link from 'next/link'
 

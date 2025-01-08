@@ -10,9 +10,6 @@ import { useRouter } from 'next/navigation'
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { createClient } from '@/lib/supabase-client'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Database } from '@/lib/database.types'
 import { useSupabase } from '@/providers/supabase-provider'
 
 interface SignupFormData {
