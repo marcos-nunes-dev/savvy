@@ -1,42 +1,41 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { type NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const response = NextResponse.next()
 
   if (code) {
-    const response = NextResponse.redirect(new URL('/dashboard', request.url))
-
+    const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           get(name: string) {
-            return request.cookies.get(name)?.value
+            return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: CookieOptions) {
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-            })
+            cookieStore.set(name, value, options)
           },
           remove(name: string, options: CookieOptions) {
-            response.cookies.set({
-              name,
-              value: '',
-              ...options,
-            })
+            cookieStore.set(name, '', options)
           },
         },
       }
     )
-
-    await supabase.auth.exchangeCodeForSession(code)
+    
+    try {
+      await supabase.auth.exchangeCodeForSession(code)
+    } catch (error) {
+      console.error('Auth callback error:', error)
+      return NextResponse.redirect(
+        new URL(`/login?error=Authentication failed`, requestUrl.origin)
+      )
+    }
   }
 
-  // URL to redirect to after sign in process completes
   return NextResponse.redirect(new URL('/dashboard', request.url))
 } 

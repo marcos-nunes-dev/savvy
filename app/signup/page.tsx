@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useForm } from "react-hook-form"
 import { motion, AnimatePresence } from "framer-motion"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
@@ -9,13 +10,36 @@ import { useRouter } from 'next/navigation'
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Database } from '@/lib/database.types'
+import { useSupabase } from '@/providers/supabase-provider'
+
+interface SignupFormData {
+  businessName: string
+  businessType: string
+  whatsappNumber: string
+  whatsappName: string
+  botName: string
+  botPersonality: string
+  email: string
+  password: string
+  confirmPassword: string
+}
+
+type FieldName = keyof SignupFormData
+
+interface FormField {
+  name: FieldName
+  label: string
+  type: string
+}
 
 const steps = [
   {
     title: "Bem-vindo ao Savvy",
     description: "Vamos configurar seu bot de WhatsApp em poucos passos.",
-    fields: []
+    fields: [] as FormField[]
   },
   {
     title: "Informações do Negócio",
@@ -23,7 +47,7 @@ const steps = [
     fields: [
       { name: "businessName", label: "Nome da Empresa", type: "text" },
       { name: "businessType", label: "Tipo de Negócio", type: "text" },
-    ]
+    ] as FormField[]
   },
   {
     title: "Detalhes do WhatsApp",
@@ -31,7 +55,7 @@ const steps = [
     fields: [
       { name: "whatsappNumber", label: "Número do WhatsApp", type: "tel" },
       { name: "whatsappName", label: "Nome de Exibição", type: "text" },
-    ]
+    ] as FormField[]
   },
   {
     title: "Personalização do Bot",
@@ -39,7 +63,7 @@ const steps = [
     fields: [
       { name: "botName", label: "Nome do Bot", type: "text" },
       { name: "botPersonality", label: "Personalidade do Bot", type: "textarea" },
-    ]
+    ] as FormField[]
   },
   {
     title: "Criar sua Conta",
@@ -48,101 +72,63 @@ const steps = [
       { name: "email", label: "Email", type: "email" },
       { name: "password", label: "Senha", type: "password" },
       { name: "confirmPassword", label: "Confirmar Senha", type: "password" },
-    ]
+    ] as FormField[]
   },
   {
     title: "Configuração Concluída",
     description: "Seu bot está pronto para começar! Verifique seu email para confirmar sua conta.",
-    fields: []
+    fields: [] as FormField[]
   }
 ]
 
 export default function SignUpPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
-  const [formData, setFormData] = useState<Record<string, string>>({})
   const [error, setError] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<SignupFormData>()
+  const { session, supabase, isLoading: isSessionLoading } = useSupabase()
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }))
-    setError('')
+  useEffect(() => {
+    if (session) {
+      router.replace('/dashboard')
+    }
+  }, [session, router])
+
+  if (isSessionLoading) {
+    return null // or a loading spinner
   }
 
-  const handleSignUp = async () => {
-    // Validate email
-    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setError('Por favor, insira um email válido')
-      return
-    }
-
-    // Validate password
-    if (!formData.password || formData.password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres')
-      return
-    }
-
-    if (formData.password !== formData.confirmPassword) {
+  const handleSignUp = async (data: SignupFormData) => {
+    if (data.password !== data.confirmPassword) {
       setError('As senhas não coincidem')
       return
     }
 
     setIsLoading(true)
     try {
-      const supabase = createClient()
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
+      const { data: userData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
         options: {
           data: {
-            business_name: formData.businessName,
-            business_type: formData.businessType,
-            whatsapp_number: formData.whatsappNumber,
-            whatsapp_name: formData.whatsappName,
-            bot_name: formData.botName,
-            bot_personality: formData.botPersonality,
+            business_name: data.businessName,
+            business_type: data.businessType,
+            whatsapp_number: data.whatsappNumber,
+            whatsapp_name: data.whatsappName,
+            bot_name: data.botName,
+            bot_personality: data.botPersonality,
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       })
 
-      if (signUpError) {
-        console.error('Signup Error:', {
-          status: signUpError.status,
-          message: signUpError.message,
-          details: signUpError
-        })
-        
-        // Handle specific error cases
-        if (signUpError.message?.includes('User already registered')) {
-          throw new Error('Este email já está registrado. Por favor, faça login ou use outro email.')
-        }
-        
-        if (signUpError.message?.includes('Password should be at least 6 characters')) {
-          throw new Error('A senha deve ter pelo menos 6 caracteres.')
-        }
-
-        if (signUpError.status === 429) {
-          throw new Error('Muitas tentativas de cadastro. Por favor, aguarde alguns minutos e tente novamente.')
-        }
-
-        // Generic error message for other cases
-        throw new Error(signUpError.message || 'Erro ao criar conta. Por favor, tente novamente.')
-      }
+      if (signUpError) throw signUpError
       
-      if (data.user) {
-        // Show success message in the last step
+      if (userData.user) {
         setCurrentStep(steps.length - 1)
-        
-        // Auto-redirect to dashboard after a short delay
-        setTimeout(() => {
-          router.push('/dashboard')
-          router.refresh()
-        }, 2000)
+        steps[steps.length - 1].description = 
+          `Enviamos um email de confirmação para ${data.email}. Por favor, verifique sua caixa de entrada para ativar sua conta.`
       } else {
         throw new Error('Erro ao criar usuário. Por favor, tente novamente.')
       }
@@ -156,7 +142,8 @@ export default function SignUpPage() {
 
   const validateStep = () => {
     const currentFields = steps[currentStep].fields
-    const missingFields = currentFields.filter(field => !formData[field.name])
+    const formValues = watch()
+    const missingFields = currentFields.filter(field => !formValues[field.name])
     
     if (missingFields.length > 0) {
       setError(`Por favor, preencha todos os campos obrigatórios`)
@@ -168,14 +155,12 @@ export default function SignUpPage() {
   const handleNextStep = async (e: React.MouseEvent) => {
     e.preventDefault()
     
-    if (isSubmitting) return
+    if (isLoading) return
 
     // If we're on the signup step (where we collect email/password)
     if (currentStep === 4) { // Email/password step
       if (!validateStep()) return
-      setIsSubmitting(true)
-      await handleSignUp()
-      setIsSubmitting(false)
+      await handleSignUp(watch())
       return
     }
 
@@ -235,18 +220,14 @@ export default function SignUpPage() {
                       {field.type === 'textarea' ? (
                         <Textarea 
                           id={field.name} 
-                          name={field.name}
-                          value={formData[field.name] || ''}
-                          onChange={handleInputChange}
+                          {...register(field.name)}
                           className="w-full"
                         />
                       ) : (
                         <Input 
                           type={field.type} 
                           id={field.name} 
-                          name={field.name}
-                          value={formData[field.name] || ''}
-                          onChange={handleInputChange}
+                          {...register(field.name)}
                           className="w-full"
                         />
                       )}
@@ -267,7 +248,7 @@ export default function SignUpPage() {
                 )}
                 <Button
                   onClick={handleNextStep}
-                  disabled={isLoading || isSubmitting}
+                  disabled={isLoading}
                   variant="gradient"
                   className="text-base px-6 py-3"
                 >

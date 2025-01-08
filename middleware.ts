@@ -36,18 +36,15 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  // If user is not signed in and trying to access protected routes
-  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    if (!session) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
   }
 
   return response
 }
 
-// Specify which routes to run the middleware on
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/api/protected/:path*'
-  ]
+  matcher: ['/dashboard/:path*', '/login', '/signup', '/auth/:path*']
 } 
