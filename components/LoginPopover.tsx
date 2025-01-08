@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { LinearButton, GradientButton } from "@/components/ui/linear-button"
+import { LinearButton } from "@/components/ui/linear-button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from '@/lib/supabase'
@@ -23,13 +23,17 @@ export function LoginForm({ asPopover = true }: LoginFormProps) {
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [name]: value
     }))
   }
 
-  const handleLogin = async () => {
+  const handleLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    
+    if (isLoading) return
     setIsLoading(true)
     setError('')
 
@@ -52,7 +56,7 @@ export function LoginForm({ asPopover = true }: LoginFormProps) {
   }
 
   const LoginContent = () => (
-    <div className="space-y-4">
+    <form onSubmit={handleLogin} className="space-y-4">
       <div className="space-y-2">
         <h4 className="font-medium text-lg">Bem-vindo de volta</h4>
         <p className="text-sm text-muted-foreground">
@@ -76,6 +80,7 @@ export function LoginForm({ asPopover = true }: LoginFormProps) {
             placeholder="seu@email.com"
             value={formData.email}
             onChange={handleInputChange}
+            required
           />
         </div>
         <div className="space-y-2">
@@ -86,13 +91,14 @@ export function LoginForm({ asPopover = true }: LoginFormProps) {
             type="password"
             value={formData.password}
             onChange={handleInputChange}
+            required
           />
         </div>
       </div>
 
       <LinearButton 
+        type="submit"
         className="w-full" 
-        onClick={handleLogin}
         disabled={isLoading}
       >
         {isLoading ? 'Entrando...' : 'Entrar'}
@@ -104,7 +110,7 @@ export function LoginForm({ asPopover = true }: LoginFormProps) {
           Criar conta
         </Link>
       </p>
-    </div>
+    </form>
   )
 
   if (!asPopover) {

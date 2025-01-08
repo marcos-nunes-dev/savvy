@@ -63,6 +63,7 @@ export default function SignUpPage() {
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [error, setError] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
@@ -134,7 +135,14 @@ export default function SignUpPage() {
       }
       
       if (data.user) {
-        nextStep()
+        // Show success message in the last step
+        setCurrentStep(steps.length - 1)
+        
+        // Auto-redirect to dashboard after a short delay
+        setTimeout(() => {
+          router.push('/dashboard')
+          router.refresh()
+        }, 2000)
       } else {
         throw new Error('Erro ao criar usuário. Por favor, tente novamente.')
       }
@@ -157,17 +165,22 @@ export default function SignUpPage() {
     return true
   }
 
-  const nextStep = () => {
-    // Validate current step fields
-    if (!validateStep()) return
+  const handleNextStep = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    
+    if (isSubmitting) return
 
     // If we're on the signup step (where we collect email/password)
     if (currentStep === 4) { // Email/password step
-      handleSignUp()
+      if (!validateStep()) return
+      setIsSubmitting(true)
+      await handleSignUp()
+      setIsSubmitting(false)
       return
     }
 
-    // Otherwise, just move to next step
+    // For all other steps, validate and move forward
+    if (!validateStep()) return
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1)
     }
@@ -253,8 +266,8 @@ export default function SignUpPage() {
                   </Button>
                 )}
                 <Button
-                  onClick={nextStep}
-                  disabled={isLoading}
+                  onClick={handleNextStep}
+                  disabled={isLoading || isSubmitting}
                   variant="gradient"
                   className="text-base px-6 py-3"
                 >
